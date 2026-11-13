@@ -1,6 +1,7 @@
 import { validateTree } from '../lib/tree.js';
-import { layoutTree, CARD_WIDTH, CARD_HEIGHT } from './layout.js';
+import { layoutTree, measureTree } from './layout.js';
 
+const MIN_ZOOM = .005, MAX_ZOOM = 64;
 
 /** Mount a self-contained hierarchy canvas. Requires style.css and a sized host. */
 export function createTreeViewer(container, { onChange = () => {} } = {}) {
@@ -16,7 +17,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let tree, graph, selected = null, query = '';
   let focusRootId = null, overview = null;
-  let index = new Map(), parents = new Map(), collapsed = new Set();
+  let index = new Map(), parents = new Map(), collapsed = new Set(), metrics = new Map();
   let view = { x: 0, y: 0, scale: 1 }, animation = 0, destroyed = false;
   let displayed = new Map(), layoutFrame = 0;
   const nodeElements = new Map(), edgeElements = new Map();
@@ -77,11 +78,11 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   function initialFrame() {
     if (!graph) return;
     if (container.clientWidth > 650) { fit(false); return; }
-    const root = graph.nodes[0], scale = .9;
-    moveTo({ scale, x: container.clientWidth / 2 - (root.x + CARD_WIDTH / 2) * scale, y: 100 }, false);
+    const root = graph.nodes[0], scale = Math.min(1, (container.clientWidth - 64) / root.width);
+    moveTo({ scale, x: container.clientWidth / 2 - (root.x + root.width / 2) * scale, y: 100 }, false);
   }
   function zoom(factor, x = container.clientWidth / 2, y = container.clientHeight / 2, smooth = true) {
-    const scale = Math.max(.005, Math.min(2.5, view.scale * factor)), ratio = scale / view.scale;
+    const scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.scale * factor)), ratio = scale / view.scale;
     moveTo({ scale, x: x - (x - view.x) * ratio, y: y - (y - view.y) * ratio }, smooth);
   }
   function ancestors(id) {
@@ -143,11 +144,14 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
       const element = nodeElements.get(node.id);
       // Animate layout coordinates, never scale a cached layer of text.
       element.style.left = `${node.x}px`; element.style.top = `${node.y}px`;
+      element.style.width = `${node.width}px`; element.style.height = `${node.height}px`;
+      element.style.setProperty('--node-scale', node.size);
       element.style.opacity = String(node.opacity);
       const parent = positions.get(node.parent), edge = edgeElements.get(node.id);
       if (!parent || !edge) continue;
-      const sx = parent.x + CARD_WIDTH / 2, sy = parent.y + CARD_HEIGHT + 9;
-      const ex = node.x + CARD_WIDTH / 2, ey = node.y, middle = (sy + ey) / 2;
+      const sx = parent.x + parent.width / 2, sy = parent.y + parent.height + 17 * parent.size;
+      const ex = node.x + node.width / 2, ey = node.y, middle = (sy + ey) / 2;
+      edge.style.setProperty('--edge-scale', Math.min(node.size, parent.size));
       edge.setAttribute('d', `M${sx},${sy} C${sx},${middle} ${ex},${middle} ${ex},${ey}`);
       edge.style.opacity = String(Math.min(node.opacity, parent.opacity));
     }
@@ -155,9 +159,11 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   function render({ animate = false, anchorId = null, rootX = null } = {}) {
     cancelAnimationFrame(layoutFrame);
     const from = new Map(displayed);
-    graph = layoutTree(scopeRoot(), collapsed);
+    graph = layoutTree(scopeRoot(), collapsed, metrics);
     const anchor = graph.nodes.find(node => node.id === anchorId);
-    const offset = rootX !== null ? rootX - graph.nodes[0].x : anchor && from.has(anchorId) ? from.get(anchorId).x - anchor.x : 0;
+    const previousAnchor = from.get(anchorId);
+    const offset = rootX !== null ? rootX - graph.nodes[0].x : anchor && previousAnchor
+      ? previousAnchor.x + previousAnchor.width / 2 - anchor.x - anchor.width / 2 : 0;
     graph.left = offset;
     for (const node of graph.nodes) node.x += offset;
     const target = new Map(graph.nodes.map(node => [node.id, { ...node, opacity: 1 }]));
@@ -168,7 +174,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
       while (parentId !== null && parentId !== undefined) {
         if (known.has(parentId)) {
           const parent = positions.get(parentId) || known.get(parentId);
-          return { x: parent.x, y: parent.y + CARD_HEIGHT + 12 };
+          return { x: parent.x + parent.width / 2 - node.width / 2, y: parent.y + parent.height + 19 * parent.size };
         }
         parentId = from.get(parentId)?.parent ?? parents.get(parentId);
       }
@@ -207,6 +213,9 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
           ...end,
           x: start.x + (end.x - start.x) * eased,
           y: start.y + (end.y - start.y) * eased,
+          width: start.width + (end.width - start.width) * eased,
+          height: start.height + (end.height - start.height) * eased,
+          size: start.size + (end.size - start.size) * eased,
           opacity: start.opacity + (end.opacity - start.opacity) * eased,
         });
       }
@@ -240,8 +249,8 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     ancestors(id).forEach(parent => collapsed.delete(parent));
     render({ animate: true, anchorId: scopeRoot().id }); select(id);
     const node = graph.nodes.find(item => item.id === id), a = area();
-    const scale = Math.min(1, Math.max(.9, view.scale));
-    moveTo({ scale, x: a.x + a.width / 2 - (node.x + CARD_WIDTH / 2) * scale, y: a.y + a.height / 2 - (node.y + CARD_HEIGHT / 2) * scale });
+    const scale = Math.min(MAX_ZOOM, a.width * .85 / node.width, Math.max(view.scale, Math.min(320, a.width * .7) / node.width));
+    moveTo({ scale, x: a.x + a.width / 2 - (node.x + node.width / 2) * scale, y: a.y + a.height / 2 - (node.y + node.height / 2) * scale });
   }
   function focusSubtree(id) {
     if (!index.has(id)) throw new Error(`Unknown node: ${id}`);
@@ -254,8 +263,9 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     const a = area(), root = graph.nodes[0];
     // Keep a large focused branch readable. Fit remains available for its
     // complete overview; focus should not recreate the unreadable panorama.
-    const scale = Math.min(1, Math.max(.85, Math.min(a.width / graph.width, a.height / graph.height)));
-    moveTo({ scale, x: a.x + a.width / 2 - (root.x + CARD_WIDTH / 2) * scale, y: a.y + 30 });
+    const scale = Math.min(MAX_ZOOM, Math.min(480, a.width * .85) / root.width,
+      Math.max(Math.min(360, a.width * .7) / root.width, Math.min(a.width / graph.width, a.height / graph.height)));
+    moveTo({ scale, x: a.x + a.width / 2 - (root.x + root.width / 2) * scale, y: a.y + 30 });
   }
   function showFullTree() {
     if (!tree || !focusRootId) return;
@@ -288,6 +298,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   function setTree(input, { preserveView = false } = {}) {
     const normalized = validateTree(input);
     tree = normalized;
+    metrics = measureTree(tree.root);
     index = new Map(); parents = new Map();
     function visit(node, parent = null, depth = 0) {
       index.set(node.id, { ...node, depth }); parents.set(node.id, parent);
@@ -309,7 +320,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     cancelAnimationFrame(layoutFrame);
     displayed.clear(); nodeElements.clear(); edgeElements.clear();
     tree = graph = null; selected = null; focusRootId = null; overview = null;
-    index.clear(); parents.clear(); collapsed.clear();
+    index.clear(); parents.clear(); collapsed.clear(); metrics.clear();
     $('.tree-nodes').replaceChildren(); $('.tree-edges').replaceChildren();
     $('.tree-message').textContent = message; $('.tree-message').hidden = false;
     notify();
@@ -342,7 +353,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size === 2 && pinch) {
       const [a, b] = [...pointers.values()], r = canvas.getBoundingClientRect();
-      const scale = Math.max(.005, Math.min(2.5, pinch.view.scale * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, pinch.distance)));
+      const scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinch.view.scale * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, pinch.distance)));
       const ratio = scale / pinch.view.scale;
       view = { scale, x: (a.x + b.x) / 2 - r.left - (pinch.x - pinch.view.x) * ratio, y: (a.y + b.y) / 2 - r.top - (pinch.y - pinch.view.y) * ratio };
       moved = true;
