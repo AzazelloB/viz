@@ -1,8 +1,6 @@
 import { validateTree } from '../lib/tree.js';
 import { layoutTree, CARD_WIDTH, CARD_HEIGHT } from './layout.js';
-import { icon } from './icons.js';
 
-const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 /** Mount a self-contained hierarchy canvas. Requires style.css and a sized host. */
 export function createTreeViewer(container, { onChange = () => {} } = {}) {
@@ -10,9 +8,9 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   container.innerHTML = `<div class="tree-canvas" tabindex="0" role="region" aria-label="Hierarchy canvas">
     <div class="tree-world"><div class="tree-scene"><svg class="tree-edges" aria-hidden="true"></svg><div class="tree-nodes"></div></div></div>
     <div class="tree-message">No tree loaded.</div>
-  </div><aside class="tree-inspector" aria-label="Node details" hidden></aside>`;
+  </div>`;
   const $ = selector => container.querySelector(selector);
-  const canvas = $('.tree-canvas'), world = $('.tree-world'), scene = $('.tree-scene'), panel = $('.tree-inspector');
+  const canvas = $('.tree-canvas'), world = $('.tree-world'), scene = $('.tree-scene');
   const controller = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: controller.signal });
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -33,8 +31,12 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   function inScope(id) { return !focusRootId || ancestors(id).includes(focusRootId); }
   function notify() {
     const branches = scopeNodes().filter(node => node.children.length);
+    const node = index.get(selected);
     onChange({
       zoom: view.scale, selectedId: selected, focusRootId,
+      selectedLabel: node?.label ?? null,
+      canFocusSubtree: !!node?.children.length && node.id !== scopeRoot()?.id,
+      canGoToParent: parents.get(selected || scopeRoot()?.id) != null,
       collapsedCount: branches.filter(node => collapsed.has(node.id)).length,
       canCollapse: branches.some(node => !collapsed.has(node.id)),
     });
@@ -64,9 +66,8 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   }
   function area() {
     const width = container.clientWidth, height = container.clientHeight;
-    const side = !panel.hidden && width > 650 ? 380 : 0;
-    const bottom = !panel.hidden && width <= 650 ? panel.offsetHeight + 90 : 80;
-    return { x: 32, y: 86, width: Math.max(150, width - 64 - side), height: Math.max(100, height - 86 - bottom) };
+    const bottom = selected === null ? 80 : 128;
+    return { x: 32, y: 86, width: Math.max(150, width - 64), height: Math.max(100, height - 86 - bottom) };
   }
   function fit(smooth = true) {
     if (!graph) return;
@@ -90,13 +91,14 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
   }
   function find(text) {
     const term = text.trim().toLowerCase();
-    return term ? [...index.values()].filter(node => `${node.label} ${node.subtitle || ''} ${node.description || ''} ${node.source || ''}`.toLowerCase().includes(term)) : [];
+    return term ? [...index.values()].filter(node => node.label.toLowerCase().includes(term)) : [];
   }
   function highlight() {
     const path = new Set(selected ? ancestors(selected) : []), matches = new Set(find(query).map(node => node.id));
     container.querySelectorAll('.node').forEach(el => {
       el.classList.toggle('selected', el.dataset.id === selected);
       el.classList.toggle('search-match', matches.has(el.dataset.id));
+      el.querySelector('.node-main').setAttribute('aria-pressed', String(el.dataset.id === selected));
     });
     container.querySelectorAll('.tree-edges path').forEach(el => el.classList.toggle('active', path.has(el.dataset.child)));
   }
@@ -117,7 +119,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     else element.setAttribute('aria-hidden', 'true');
     const main = element.querySelector('.node-main');
     main.dataset.select = node.id;
-    main.setAttribute('aria-label', `${node.label}. Show details.`);
+    main.setAttribute('aria-label', `Select ${node.label}`);
     element.querySelector('.node-label').textContent = node.label;
     let toggle = element.querySelector('.node-toggle');
     if (node.children.length) {
@@ -216,25 +218,10 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     draw(new Map([...destination].map(([id, node]) => [id, { ...node, ...from.get(id) }])));
     layoutFrame = requestAnimationFrame(frame);
   }
-  function renderPanel() {
-    const node = index.get(selected);
-    const previousId = panel.dataset.nodeId, previousScroll = panel.scrollTop;
-    panel.hidden = !node;
-    if (!node) return;
-    panel.dataset.nodeId = node.id;
-    const parent = index.get(parents.get(node.id));
-    panel.innerHTML = `<div class="inspector-header">${parent ? `<button data-action="parent" aria-label="Go to parent: ${escape(parent.label)}" title="Parent: ${escape(parent.label)}">${icon('up')}</button>` : ''}<h2>${escape(node.label)}</h2><button data-action="close" aria-label="Close node details" title="Close">${icon('close')}</button></div>
-      ${node.subtitle ? `<p class="inspector-subtitle">${escape(node.subtitle)}</p>` : ''}
-      ${node.source ? `<code class="inspector-source">${escape(node.source)}</code>` : ''}
-      ${node.description ? `<p class="inspector-description">${escape(node.description)}</p>` : ''}
-      ${node.children.length ? `<div class="inspector-children">${node.children.map(child => `<button data-child="${escape(child.id)}">${escape(child.label)}</button>`).join('')}</div>` : ''}
-      ${node.children.length ? `<div class="inspector-actions">${node.id !== scopeRoot().id ? '<button data-action="subtree">Focus subtree</button>' : ''}<button data-action="toggle">${collapsed.has(selected) ? 'Expand' : 'Collapse'}</button></div>` : ''}`;
-    panel.scrollTop = previousId === node.id ? previousScroll : 0;
-  }
   function select(id) {
     if (id !== null && !index.has(id)) throw new Error(`Unknown node: ${id}`);
     selected = id;
-    renderPanel(); highlight(); notify();
+    highlight(); notify();
   }
   function setCollapsed(id, fold) {
     if (!index.has(id)) throw new Error(`Unknown node: ${id}`);
@@ -244,11 +231,11 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
       if (selected !== id && ancestors(selected).includes(id)) selected = id;
     } else collapsed.delete(id);
     ++animation;
-    render({ animate: true, anchorId: id }); renderPanel();
+    render({ animate: true, anchorId: id });
   }
   function focus(id) {
     if (!index.has(id)) throw new Error(`Unknown node: ${id}`);
-    // Search and detail navigation can also reveal a node outside the focus.
+    // Search and keyboard navigation can reveal a node outside the focus.
     if (!inScope(id)) { focusRootId = null; overview = null; }
     ancestors(id).forEach(parent => collapsed.delete(parent));
     render({ animate: true, anchorId: scopeRoot().id }); select(id);
@@ -263,7 +250,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     focusRootId = id;
     collapsed.delete(id);
     selected = id;
-    renderPanel(); render({ animate: true, anchorId: id });
+    render({ animate: true, anchorId: id });
     const a = area(), root = graph.nodes[0];
     // Keep a large focused branch readable. Fit remains available for its
     // complete overview; focus should not recreate the unreadable panorama.
@@ -274,7 +261,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     if (!tree || !focusRootId) return;
     const previous = overview;
     focusRootId = null; overview = null;
-    renderPanel(); render({ animate: true, rootX: previous?.rootX ?? null });
+    render({ animate: true, rootX: previous?.rootX ?? null });
     if (previous) moveTo({ ...previous.view });
     else fit();
   }
@@ -291,12 +278,12 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     const root = scopeRoot();
     scopeNodes().forEach(node => { if (node.children.length) collapsed.add(node.id); });
     if (selected !== null) selected = root.id;
-    renderPanel(); render({ animate: true, anchorId: root.id }); fit();
+    render({ animate: true, anchorId: root.id }); fit();
   }
   function expandAll() {
     if (!tree) return;
     scopeNodes().forEach(node => collapsed.delete(node.id));
-    renderPanel(); render({ animate: true, anchorId: scopeRoot().id }); fit();
+    render({ animate: true, anchorId: scopeRoot().id }); fit();
   }
   function setTree(input, { preserveView = false } = {}) {
     const normalized = validateTree(input);
@@ -313,7 +300,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     if (!index.has(selected)) selected = null;
     collapsed = new Set([...collapsed].filter(id => index.has(id)));
     $('.tree-message').hidden = true;
-    renderPanel(); render({ animate: preserveView, anchorId: preserveView ? scopeRoot().id : null });
+    render({ animate: preserveView, anchorId: preserveView ? scopeRoot().id : null });
     if (!preserveView || lostFocus) initialFrame();
     return tree;
   }
@@ -323,7 +310,7 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
     displayed.clear(); nodeElements.clear(); edgeElements.clear();
     tree = graph = null; selected = null; focusRootId = null; overview = null;
     index.clear(); parents.clear(); collapsed.clear();
-    $('.tree-nodes').replaceChildren(); $('.tree-edges').replaceChildren(); panel.hidden = true;
+    $('.tree-nodes').replaceChildren(); $('.tree-edges').replaceChildren();
     $('.tree-message').textContent = message; $('.tree-message').hidden = false;
     notify();
   }
@@ -335,14 +322,6 @@ export function createTreeViewer(container, { onChange = () => {} } = {}) {
       setCollapsed(id, !collapsed.has(id));
       [...container.querySelectorAll('[data-toggle]')].find(button => button.dataset.toggle === id)?.focus({ preventScroll: true });
     } else if (node) select(node.dataset.select);
-  });
-  listen(panel, 'click', event => {
-    const child = event.target.closest('[data-child]'), action = event.target.closest('[data-action]')?.dataset.action;
-    if (child) focus(child.dataset.child);
-    if (action === 'close') { select(null); canvas.focus(); }
-    if (action === 'subtree') focusSubtree(selected);
-    if (action === 'parent') goToParent();
-    if (action === 'toggle') setCollapsed(selected, !collapsed.has(selected));
   });
   const pointers = new Map();
   let drag, pinch, moved = false;

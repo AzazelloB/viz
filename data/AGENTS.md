@@ -3,8 +3,9 @@
 Follow the visualization contract and workflow in `../AGENTS.md`. Write JSON directly in this folder using `../schema.json`. The app discovers files and updates the view automatically. No JavaScript generator or registration is needed.
 
 - Required fields: tree `title` and `root`; node `label`.
-- Optional tree field: `description`. Optional node fields: `id`, `subtitle`, `description`, `source`, `children`.
-- Only labels appear on the canvas. Factual descriptions and source references appear in the details panel. Do not add subtitles unless requested.
+- Optional node fields: `id` and `children`. No other tree or node fields are supported.
+- Labels and the hierarchy carry the entire explanation. Keep evidence and placement reasoning outside the dataset.
+- Prefer a minimum sufficient tree. Add a node only for an important distinction, and remove branches that merely narrate routine controls, checks, or bookkeeping. Represent a shared rule once rather than once per enforcement point.
 - Use stable, unique IDs. Retain IDs for unchanged concepts when updating a tree.
 - Sibling order determines left-to-right placement.
 - Filenames must begin with a letter or number, contain only letters, numbers, hyphens or underscores, and end in `.json`.

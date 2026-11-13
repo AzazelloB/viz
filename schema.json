@@ -6,7 +6,6 @@
   "additionalProperties": false,
   "properties": {
     "title": { "type": "string", "minLength": 1, "maxLength": 120, "pattern": "\\S" },
-    "description": { "type": "string", "maxLength": 4000 },
     "root": { "$ref": "#/$defs/node" }
   },
   "$defs": {
@@ -17,9 +16,6 @@
       "properties": {
         "id": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S", "description": "Use stable, unique IDs for live updates. Omitted IDs are generated." },
         "label": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S" },
-        "subtitle": { "type": "string", "maxLength": 200 },
-        "description": { "type": "string", "maxLength": 4000 },
-        "source": { "type": "string", "maxLength": 500, "description": "Optional source location, for example src/parser.ts:24." },
         "children": { "type": "array", "items": { "$ref": "#/$defs/node" } }
       }
     }

@@ -12,7 +12,13 @@ const tree = validateTree(input);
 
 Returns a normalized copy without mutating the input or doing I/O. Rejects unknown fields, invalid values, duplicate IDs, more than 2,000 nodes or more than 40 levels. Missing IDs are generated deterministically; explicit stable IDs are recommended for live editing.
 
+Trees contain only `title` and `root`. Nodes contain only `id`, `label`, and `children`; `id` and `children` are optional on input. Normalized nodes always have an ID and a children array.
+
 For files, use `npm run validate -- data/name.json`. There is no HTTP write API or JavaScript file-writing wrapper.
+
+## Catalog
+
+`listDatasets()` from `lib/data.js` returns the discovered files. Valid entries contain `file`, `title`, `revision`, and `nodeCount`, including the root. Invalid entries remain selectable with an `error` and no node count. The same catalog is served at `/data.json`.
 
 ## Viewer
 
@@ -22,11 +28,13 @@ Include `public/style.css` and give the container a width and height:
 import { createTreeViewer } from './public/tree-viewer.js';
 
 const viewer = createTreeViewer(document.querySelector('#container'), {
-  onChange(state) { /* zoom, selectedId, focusRootId, collapsedCount, canCollapse */ },
+  onChange(state) { /* zoom, selectedId, selectedLabel, focusRootId, canFocusSubtree, canGoToParent, collapsedCount, canCollapse */ },
 });
 viewer.setTree(data);
 viewer.fit();
 ```
+
+Selection is a highlight with bottom-panel actions. `selectedLabel` is null when nothing is selected; `canFocusSubtree` and `canGoToParent` let a host enable the corresponding controls.
 
 | Method | Behavior |
 | --- | --- |
@@ -35,7 +43,7 @@ viewer.fit();
 | `focusSubtree(id)` | Make a branch the displayed root at a readable zoom. |
 | `showFullTree()` | Restore the previous overview. |
 | `goToParent()` | Select the parent, moving up a focused subtree when necessary. |
-| `select(id \| null)` | Open or close node details. |
+| `select(id \| null)` | Select or clear the highlighted node. |
 | `collapse(id)`, `expand(id)` | Fold or unfold a branch. |
 | `collapseAll()`, `expandAll()` | Fold or unfold branches in the current subtree. |
 | `find(text)` | Return matching nodes from the entire dataset. |

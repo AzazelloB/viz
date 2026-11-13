@@ -14,7 +14,7 @@
     <header class="toolbar">
       <div class="file-picker">
         <button id="tree-select" aria-label="Choose data file" aria-haspopup="listbox" aria-expanded="false" aria-controls="tree-options">
-          <span class="file-selection"><span id="tree-title">Choose a tree</span><span id="tree-file"></span></span>
+          <span class="file-selection"><span class="file-option-heading"><span id="tree-title">Choose a tree</span><span id="tree-count" class="file-node-count" hidden></span></span><span id="tree-file"></span></span>
           <span class="picker-chevron" data-icon="chevron"></span>
         </button>
         <div id="tree-options" role="listbox" aria-label="Data files" hidden></div>
@@ -25,14 +25,22 @@
         <div id="search-results" hidden></div>
       </div>
     </header>
-    <div class="navigation" role="group" aria-label="Canvas controls">
-      <button id="zoom-out" aria-label="Zoom out" title="Zoom out" data-icon="minus"></button>
-      <button id="zoom-level" title="Reset zoom to 100%">100%</button>
-      <button id="zoom-in" aria-label="Zoom in" title="Zoom in" data-icon="plus"></button>
-      <button id="fit" aria-label="Fit tree to screen" title="Fit tree to screen" data-icon="fit"></button>
-      <button id="expand" aria-label="Expand all branches" title="Expand all branches" data-icon="expand"></button>
-      <button id="collapse" aria-label="Collapse all branches" title="Collapse all branches" data-icon="collapse" disabled></button>
-      <button id="full-tree" title="Return to the full tree" hidden><span data-icon="back"></span>Full tree</button>
+    <div class="navigation" role="group" aria-label="Tree actions">
+      <div id="node-actions" class="node-actions" hidden>
+        <button id="parent-node" aria-label="Go to parent" title="Go to parent" data-icon="up" disabled></button>
+        <span id="selected-node"></span>
+        <button id="focus-subtree" disabled>Focus subtree</button>
+        <button id="clear-selection" aria-label="Clear selection" title="Clear selection" data-icon="close"></button>
+      </div>
+      <div class="canvas-actions" role="group" aria-label="Canvas controls">
+        <button id="zoom-out" aria-label="Zoom out" title="Zoom out" data-icon="minus"></button>
+        <button id="zoom-level" title="Reset zoom to 100%">100%</button>
+        <button id="zoom-in" aria-label="Zoom in" title="Zoom in" data-icon="plus"></button>
+        <button id="fit" aria-label="Fit tree to screen" title="Fit tree to screen" data-icon="fit"></button>
+        <button id="expand" aria-label="Expand all branches" title="Expand all branches" data-icon="expand"></button>
+        <button id="collapse" aria-label="Collapse all branches" title="Collapse all branches" data-icon="collapse" disabled></button>
+        <button id="full-tree" title="Return to the full tree" hidden><span data-icon="back"></span>Full tree</button>
+      </div>
     </div>
     <div id="error" role="alert" hidden></div>
   </main>

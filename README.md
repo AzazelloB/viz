@@ -1,6 +1,6 @@
 ﻿# Hierarchy visualizer
 
-A fullscreen tree viewer for exploring a subject through its parts. Node titles stay on the canvas; descriptions and source references live in the details panel.
+A fullscreen tree viewer for exploring a subject through its parts. Labels and the hierarchy carry the explanation.
 
 ```sh
 npm run dev
@@ -12,21 +12,25 @@ Open http://127.0.0.1:3000. Requires Node.js 22+. No dependencies or build step.
 
 Ask an agent working in this project to visualize a subject or codebase. [AGENTS.md](AGENTS.md) defines how to inspect it and organize the hierarchy. The agent writes a file in `data/`; no generator or application code changes are needed.
 
-For example, `data/company.json`:
+For example, `data/bicycle.json`:
 
 ```json
 {
-  "title": "Company",
+  "title": "Bicycle",
   "root": {
-    "id": "ceo",
-    "label": "CEO",
+    "id": "bicycle",
+    "label": "Bicycle",
     "children": [
       {
-        "id": "engineering",
-        "label": "Engineering",
-        "description": "Builds and maintains the product.",
+        "id": "frame",
+        "label": "Frame"
+      },
+      {
+        "id": "wheels",
+        "label": "Wheels",
         "children": [
-          { "id": "engineers", "label": "Engineers" }
+          { "id": "front-wheel", "label": "Front" },
+          { "id": "rear-wheel", "label": "Rear" }
         ]
       }
     ]
@@ -35,7 +39,7 @@ For example, `data/company.json`:
 ```
 
 ```sh
-npm run validate -- data/company.json
+npm run validate -- data/bicycle.json
 ```
 
 Validation checks the JSON deterministically without changing it. Omit the filename to validate every dataset. See [schema.json](schema.json) and [data/AGENTS.md](data/AGENTS.md) for fields and limits. Use stable, unique IDs so edits retain selection and collapsed branches.
@@ -46,7 +50,7 @@ Datasets stay local and are excluded from Git. A fresh checkout starts with an e
 
 ## Explore
 
-Choose a dataset from the dropdown. Click a node for its details, then follow its children or the parent arrow. Focus subtree isolates a branch; Full tree restores the previous overview. Trees start expanded, with buttons to collapse or expand all branches in the current view.
+Choose a dataset from the dropdown; each entry includes its node count. Click a node to select it. The bottom panel provides parent navigation and Focus subtree; Full tree restores the previous overview. Trees start expanded, with buttons to collapse or expand all branches in the current view.
 
 Drag to pan, scroll to zoom, `F` to fit, `/` to search, and arrow keys to navigate. The small triangle under a node expands or collapses its children.
 

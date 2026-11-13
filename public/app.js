@@ -2,13 +2,20 @@ import { createTreeViewer } from './tree-viewer.js';
 import { icon } from './icons.js';
 
 const $ = selector => document.querySelector(selector);
+const nodeCountLabel = count => `${count.toLocaleString()} ${count === 1 ? 'node' : 'nodes'}`;
+let selectedId = null;
 document.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 const viewer = createTreeViewer($('#viewer'), {
-  onChange({ zoom, collapsedCount, canCollapse, focusRootId }) {
+  onChange({ zoom, collapsedCount, canCollapse, focusRootId, selectedId: selection, selectedLabel, canFocusSubtree, canGoToParent }) {
+    selectedId = selection;
     $('#zoom-level').textContent = `${Math.round(zoom * 100)}%`;
     $('#expand').disabled = collapsedCount === 0;
     $('#collapse').disabled = !canCollapse;
     $('#full-tree').hidden = !focusRootId;
+    $('#node-actions').hidden = selectedId === null;
+    $('#selected-node').textContent = selectedLabel ?? '';
+    $('#focus-subtree').disabled = !canFocusSubtree;
+    $('#parent-node').disabled = !canGoToParent;
   },
 });
 let catalog = [], currentFile, displayedFile, revision, loadVersion = 0;
@@ -18,6 +25,8 @@ function updatePicker() {
   const entry = catalog.find(item => item.file === currentFile);
   $('#tree-title').textContent = entry?.title || 'Choose a tree';
   $('#tree-file').textContent = entry?.file || '';
+  $('#tree-count').textContent = Number.isInteger(entry?.nodeCount) ? nodeCountLabel(entry.nodeCount) : '';
+  $('#tree-count').hidden = !Number.isInteger(entry?.nodeCount);
   $('#tree-select').disabled = !catalog.length;
   $('#tree-options').querySelectorAll('[role="option"]').forEach(option => {
     option.setAttribute('aria-selected', String(option.dataset.file === currentFile));
@@ -36,9 +45,16 @@ function renderPicker() {
   $('#tree-options').replaceChildren(...catalog.map(entry => {
     const option = document.createElement('button');
     option.setAttribute('role', 'option'); option.tabIndex = -1; option.dataset.file = entry.file;
+    const heading = document.createElement('span'); heading.className = 'file-option-heading';
     const title = document.createElement('span'); title.textContent = entry.title;
+    heading.append(title);
+    if (Number.isInteger(entry.nodeCount)) {
+      const count = document.createElement('span'); count.className = 'file-node-count';
+      count.textContent = nodeCountLabel(entry.nodeCount);
+      heading.append(count);
+    }
     const file = document.createElement('small'); file.textContent = entry.file;
-    option.append(title, file);
+    option.append(heading, file);
     return option;
   }));
   updatePicker();
@@ -146,6 +162,12 @@ $('#fit').onclick = () => viewer.fit();
 $('#expand').onclick = viewer.expandAll;
 $('#collapse').onclick = viewer.collapseAll;
 $('#full-tree').onclick = () => { viewer.showFullTree(); $('#viewer .tree-canvas').focus(); };
+$('#focus-subtree').onclick = () => {
+  if (selectedId !== null) viewer.focusSubtree(selectedId);
+  $('#viewer .tree-canvas').focus();
+};
+$('#parent-node').onclick = () => { viewer.goToParent(); $('#viewer .tree-canvas').focus(); };
+$('#clear-selection').onclick = () => { viewer.select(null); $('#viewer .tree-canvas').focus(); };
 
 function search() {
   const found = viewer.search($('#search').value), results = $('#search-results');
@@ -157,9 +179,6 @@ function search() {
   for (const node of found.slice(0, 30)) {
     const button = document.createElement('button'); button.dataset.id = node.id;
     button.textContent = node.label;
-    if (node.source || node.subtitle) {
-      const context = document.createElement('small'); context.textContent = node.source || node.subtitle; button.append(context);
-    }
     results.append(button);
   }
 }
