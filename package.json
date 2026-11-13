@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "validate": "node scripts/validate.js"
+    "validate": "node scripts/validate.js",
+    "review": "node scripts/review.js"
   },
   "engines": { "node": ">=22" }
 }

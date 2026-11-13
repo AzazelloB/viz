@@ -40,9 +40,12 @@ For example, `data/bicycle.json`:
 
 ```sh
 npm run validate -- data/bicycle.json
+npm run review -- data/bicycle.json
 ```
 
 Validation checks the JSON deterministically without changing it. Omit the filename to validate every dataset. See [schema.json](schema.json) and [data/AGENTS.md](data/AGENTS.md) for fields and limits. Use stable, unique IDs so edits retain selection and collapsed branches.
+
+Review reports matching sibling labels, ancestor label echoes, and repeated branch structures, with occurrence IDs and paths. These are advisory observations, not semantic errors. Repeated concepts can be useful in distinct contexts; only occurrence IDs must be unique. Hints do not change exit status or rewrite the file. Use `npm run review -- --json data/bicycle.json` for the complete report. A report with no hints does not prove that the hierarchy makes sense. See [the structuring guide](docs/STRUCTURING.md) for the source-backed ownership review.
 
 The app watches for file changes and updates the tree without reloading the page. Agents can save a small valid tree, then grow it through complete JSON snapshots. Incomplete or invalid edits show an error while the last valid tree stays visible. CSS updates apply live; other frontend edits reload the page. Development server restarts also reconnect and reload the page.
 

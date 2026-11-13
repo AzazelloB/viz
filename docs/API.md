@@ -16,6 +16,18 @@ Trees contain only `title` and `root`. Nodes contain only `id`, `label`, and `ch
 
 For files, use `npm run validate -- data/name.json`. There is no HTTP write API or JavaScript file-writing wrapper.
 
+## Advisory review
+
+```js
+import { reviewTree } from './lib/review.js';
+
+const { stats, findings } = reviewTree(input);
+```
+
+For Node authoring tools: validates the same format, then returns structural statistics (`nodes`, `levels`, `maxChildren`) and advisory findings without mutation or I/O. A finding contains a `code`, factual `observation`, review `question`, and `occurrences` with IDs and full label paths. Codes are `sibling-label`, `ancestor-label`, and `matching-branch`. The checks do not infer synonyms, enforce unique concepts, or judge conceptual ownership. Statistics are not a quality score.
+
+Use `npm run review -- data/name.json` for text or `npm run review -- --json data/name.json` for full JSON. Hints return exit code zero. Invalid data or unreadable files return a nonzero code. See [the structuring guide](STRUCTURING.md) for the pattern definitions and human review procedure.
+
 ## Catalog
 
 `listDatasets()` from `lib/data.js` returns the discovered files. Valid entries contain `file`, `title`, `revision`, and `nodeCount`, including the root. Invalid entries remain selectable with an `error` and no node count. The same catalog is served at `/data.json`.
